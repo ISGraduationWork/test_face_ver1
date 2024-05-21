@@ -15,7 +15,7 @@ while True:
     ret, frame = cap.read()
 
     # カメラ画像を幅400pxにリサイズ
-    img = imutils.resize(frame, width=400)
+    img = imutils.resize(frame, width=800)
     (h, w) = img.shape[:2]
     blob = cv2.dnn.blobFromImage(cv2.resize(img, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
 
@@ -39,7 +39,7 @@ while True:
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
     #ウィンドウに画像を表示する
-    cv2.imshow("face Detection", frame)
+    cv2.imshow("face Detection", img)
 
     #キー入力を待ち、qが押されたらループを抜ける
     if cv2.waitKey(1) & 0xFF == ord('q'):
