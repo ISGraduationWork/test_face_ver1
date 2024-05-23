@@ -42,7 +42,7 @@ while True:
     cv2.imshow("face Detection", img)
 
     #キー入力を待ち、qが押されたらループを抜ける
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(1) == ord('q'):
         break
 
 cap.release()

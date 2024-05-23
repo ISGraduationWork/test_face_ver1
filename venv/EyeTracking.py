@@ -1,39 +1,26 @@
-import cv2
 import numpy as np
-import imutils
+import dlib
+import cv2
+
+
+detector = dlib.get_frontal_face_detector()
 
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FPS, 30)
+# set FPS
 
+while(True):
 
-while True:
-    ret, frame = cap.read()
-    if ret is False:
+    ret, img = cap.read()
+    img = cv2.resize(img, (800,700))
+
+    dets = detector(img, 1)
+
+    for det in dets:
+        cv2.rectangle(img, (det.left(), det.top()), (det.right(), det.bottom()), (0, 0, 255))
+
+    cv2.imshow('img', img)
+
+    key = cv2.waitKey(1)
+    if key == ord('q'):
         break
-
-    roi = imutils.resize(frame, width=800)
-    # roi = frame[269: 795, 537: 1416]
-    rows, cols, _ = roi.shape
-    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-    gray_roi = cv2.GaussianBlur(gray_roi, (7, 7), 0)
-
-    _, threshold = cv2.threshold(gray_roi, 3, 255, cv2.THRESH_BINARY_INV)
-    contours, _ = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
-
-    for cnt in contours:
-        (x, y, w, h) = cv2.boundingRect(cnt)
-
-        #cv2.drawContours(roi, [cnt], -1, (0, 0, 255), 3)
-        cv2.rectangle(roi, (x, y), (x + w, y + h), (255, 0, 0), 2)
-        cv2.line(roi, (x + int(w/2), 0), (x + int(w/2), rows), (0, 255, 0), 2)
-        cv2.line(roi, (0, y + int(h/2)), (cols, y + int(h/2)), (0, 255, 0), 2)
-        break
-
-    cv2.imshow("Threshold", threshold)
-    cv2.imshow("gray roi", gray_roi)
-    cv2.imshow("Roi", roi)
-    #キー入力を待ち、qが押されたらループを抜ける
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cv2.destroyAllWindows()
