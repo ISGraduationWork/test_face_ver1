@@ -35,6 +35,7 @@ while True:
     # show the output image with the face detections + facial landmarks
     cv2.imshow("Output", image)
 
+    key = cv2.waitKey(1)
     if key == ord('q'):
         break
 
