@@ -2,6 +2,8 @@ import cv2
 import imutils
 import numpy as np
 import time
+from database import connect_database, close_database
+from screenshot import draw_corner_rect
 
 # Haar Cascadeによる顔検出のためのモデルを読み込む
 facedetect = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
@@ -21,6 +23,9 @@ i = 0
 face_id_counter = 1  # 顔のIDの初期値を1に設定
 faces_dict = {}
 
+# データベースに接続
+conn, c = connect_database()
+
 # 画像から顔を検出する関数
 def detect_faces(image):
     """
@@ -32,6 +37,7 @@ def detect_faces(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # 画像中の顔を検出
     faces = facedetect.detectMultiScale(gray, 1.3, 5)
+
     # 検出された顔の座標を返す
     return faces
 
@@ -69,6 +75,9 @@ while True:
 
     # 検出された顔を追跡する準備
     current_faces = []
+
+    # 画像から顔を検出
+    faces = detect_faces(img)
 
     # 各検出結果について処理
     for j in range(0, detections.shape[2]):
@@ -122,8 +131,9 @@ while True:
     if cv2.waitKey(1) == ord('q'):
         break
 
-# カメラを解放し、ウィンドウを閉じる
+# カメラを解放し、ウィンドウとデータベースを閉じる
 cap.release()
+close_database(conn)
 cv2.destroyAllWindows()
 
 print("OK")
