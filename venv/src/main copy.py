@@ -2,8 +2,10 @@ import cv2
 import imutils
 import numpy as np
 import time
-from database import connect_database, close_database
+import pickle
+import face_recognition
 from screenshot import draw_corner_rect
+from database import connect_database, close_database
 
 # Haar Cascadeによる顔検出のためのモデルを読み込む
 facedetect = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
@@ -16,44 +18,37 @@ prototxt = 'deploy.prototxt'
 model = 'res10_300x300_ssd_iter_140000.caffemodel'
 net = cv2.dnn.readNetFromCaffe(prototxt, model)
 
-# 変数の初期化
-faces_data = []
-face_count = 0  # 顔が認識された回数をカウントする変数
-i = 0
-face_id_counter = 1  # 顔のIDの初期値を1に設定
-faces_dict = {}
-
-# データベースに接続
+# データベースに接続して顔データを取得
 conn, c = connect_database()
+c.execute('SELECT name, face_encodings FROM faces')
+rows = c.fetchall()
+known_face_encodings = []
+known_face_names = []
+for row in rows:
+    stored_name = row[0]
+    stored_encodings = pickle.loads(row[1])
+    known_face_encodings.append(stored_encodings)
+    known_face_names.append(stored_name)
 
-# 画像から顔を検出する関数
-def detect_faces(image):
-    """
-    画像から顔を検出する関数
-    :param image: 入力画像
-    :return: 検出された顔の座標のリスト
-    """
-    # 画像をグレースケールに変換
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # 画像中の顔を検出
-    faces = facedetect.detectMultiScale(gray, 1.3, 5)
+# 変数の初期化
+faces_dict = {}
+face_id_counter = 1  # 顔のIDの初期値を1に設定
 
-    # 検出された顔の座標を返す
-    return faces
-
-# 画像に顔IDと経過時間を描画する関数
-def draw_face_info(img, face_id, start_x, end_y, elapsed_time):
+# 画像に顔IDと経過時間、名前を描画する関数
+def draw_face_info(img, face_id, start_x, end_y, elapsed_time, name):
     """
-    画像に顔IDと経過時間を描画する関数
+    画像に顔IDと経過時間、名前を描画する関数
     :param img: 入力画像
     :param face_id: 顔ID
     :param start_x: 顔の左上のx座標
     :param end_y: 顔の右下のy座標
     :param elapsed_time: 経過時間（HH:MM:SS形式の文字列）
+    :param name: 顔の名前
     """
-    # 顔IDと経過時間を描画
-    cv2.putText(img, face_id, (start_x, end_y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
+    # 顔ID、経過時間、名前を描画
+    # cv2.putText(img, face_id, (start_x, end_y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
     cv2.putText(img, elapsed_time, (start_x, end_y + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
+    cv2.putText(img, name, (start_x, end_y + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
 # ビデオループを開始
 while True:
@@ -65,7 +60,7 @@ while True:
         break
 
     # フレームを幅800pxにリサイズ
-    img = imutils.resize(frame, width=800)
+    img = imutils.resize(frame, width=900)
     (h, w) = img.shape[:2]
     blob = cv2.dnn.blobFromImage(cv2.resize(img, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
 
@@ -75,9 +70,6 @@ while True:
 
     # 検出された顔を追跡する準備
     current_faces = []
-
-    # 画像から顔を検出
-    faces = detect_faces(img)
 
     # 各検出結果について処理
     for j in range(0, detections.shape[2]):
@@ -108,15 +100,29 @@ while True:
                 # 既存の顔の場合は中心座標を更新
                 faces_dict[matched_face_id]['center'] = face_center
 
+            # 顔のエンコーディングを取得
+            face_img = img[startY:endY, startX:endX]
+            rgb_face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
+            face_encodings = face_recognition.face_encodings(rgb_face_img)
+
+            name = "Unknown"
+            if face_encodings:
+                face_encoding = face_encodings[0]
+                # データベースの顔エンコーディングと比較
+                matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                best_match_index = np.argmin(face_distances)
+                if matches[best_match_index]:
+                    name = known_face_names[best_match_index]
+
             # 経過時間を計算
             elapsed_time = int(time.time() - faces_dict[matched_face_id]['start_time'])
             # 経過時間をHH:MM:SS形式でフォーマット
             elapsed_time_str = "{:02d}:{:02d}:{:02d}".format(elapsed_time // 3600, (elapsed_time % 3600 // 60), elapsed_time % 60)
 
-            # バウンディングボックスと経過時間を描画
-            cv2.rectangle(img, (startX, startY), (endX, endY), (0, 0, 255), 2)
-            y = startY - 10 if startY - 10 > 10 else startY + 10
-            draw_face_info(img, matched_face_id, startX, endY, elapsed_time_str)
+            # バウンディングボックスと経過時間、名前を描画
+            draw_corner_rect(img, startX, startY, endX - startX, endY - startY)
+            draw_face_info(img, matched_face_id, startX, endY, elapsed_time_str, name)
             current_faces.append(matched_face_id)
 
     # 検出されなくなった顔をリストから削除

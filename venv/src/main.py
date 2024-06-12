@@ -2,6 +2,7 @@ import cv2
 import imutils
 import numpy as np
 import time
+from screenshot import draw_corner_rect
 
 # Haar Cascadeによる顔検出のためのモデルを読み込む
 facedetect = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
@@ -61,7 +62,7 @@ while True:
     # フレームを幅800pxにリサイズ
     img = imutils.resize(frame, width=800)
     (h, w) = img.shape[:2]
-    blob = cv2.dnn.blobFromImage(cv2.resize(img, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+    blob = cv2.dnn.blobFromImage(cv2.resize(img, (300, 300)),1.0, (300, 300), (104.0, 177.0, 123.0))
 
     # モデルに入力としてblobを設定
     net.setInput(blob)
@@ -105,8 +106,7 @@ while True:
             elapsed_time_str = "{:02d}:{:02d}:{:02d}".format(elapsed_time // 3600, (elapsed_time % 3600 // 60), elapsed_time % 60)
 
             # バウンディングボックスと経過時間を描画
-            cv2.rectangle(img, (startX, startY), (endX, endY), (0, 0, 255), 2)
-            y = startY - 10 if startY - 10 > 10 else startY + 10
+            draw_corner_rect(img, startX, startY, endX - startX, endY - startY)
             draw_face_info(img, matched_face_id, startX, endY, elapsed_time_str)
             current_faces.append(matched_face_id)
 
